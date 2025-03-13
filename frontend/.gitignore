@@ -5,6 +5,14 @@
 /.pnp
 .pnp.js
 
+# Ignore node_modules directory
+node_modules/
+
+/package-lock.json
+
+# Ignore package-lock.json
+package-lock.json
+
 # testing
 /coverage
 
@@ -21,3 +29,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+.env
+
