@@ -2,14 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import TranslationPanel from './TranslationPanel';
 import ChatPanel from './ChatPanel';
-import generateSignature from '../utils/zoomSignature';
 
 const Meeting = () => {
   const { id } = useParams();
   const [isJoined, setIsJoined] = useState(false);
-  const [participants, setParticipants] = useState([]);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('es'); // Default to Spanish
+  const [selectedLanguage, setSelectedLanguage] = useState('es');
   const [error, setError] = useState('');
   const zoomContainerRef = useRef(null);
   
@@ -28,30 +26,29 @@ const Meeting = () => {
           throw new Error('Zoom SDK credentials are missing. Check your .env file.');
         }
 
-        // In production, you'd make an API call to your backend which would generate this signature securely
-        // This is just a placeholder - implement proper signature generation on your backend
-        const signature = await generateSignature(sdkKey, sdkSecret, id, 0);
+        // For local testing - use a mock signature or generate one
+        // In production, this would come from your backend
+        const mockSignature = "MOCK_SIGNATURE_FOR_LOCAL_DEVELOPMENT";
+        
+        // IMPORTANT: Configure Zoom SDK to work with localhost during development
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+        console.log(`Using API URL: ${apiUrl} for Zoom integration`);
         
         const meetingNumber = id;
         const userName = "Test User"; // Ideally from user input or auth system
         const passWord = "";
         const userEmail = "test@example.com"; // Ideally from auth system
-        const registrantToken = "";
-        const tk = "";
-        const zak = "";
         
         await window.zoomClient.join({
-          signature: signature,
+          signature: mockSignature,
           meetingNumber: meetingNumber,
           userName: userName,
           password: passWord,
-          userEmail: userEmail,
-          tk: tk,
-          zak: zak
+          userEmail: userEmail
         });
         
         setIsJoined(true);
-        console.log("Joined the meeting successfully");
+        console.log("Joined the meeting successfully (local testing mode)");
       } catch (error) {
         console.error("Failed to join the meeting", error);
         setError(error.message || 'Failed to join meeting');
@@ -66,7 +63,7 @@ const Meeting = () => {
         window.zoomClient.leave();
       }
     };
-  }, [id]);
+  }, [id, isJoined]);
   
   // Setup audio stream for translation
   const startTranslation = () => {
@@ -94,6 +91,11 @@ const Meeting = () => {
       
       <div className="video-container">
         <div id="zoom-container" ref={zoomContainerRef}></div>
+      </div>
+      
+      {/* Display a local development notice */}
+      <div className="local-dev-notice">
+        Running in local development mode (localhost:3000)
       </div>
       
       <div className="controls-container">

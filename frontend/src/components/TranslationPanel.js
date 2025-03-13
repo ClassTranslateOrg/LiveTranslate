@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { processAudioForTranslation } from '../utils/openaiService';
+// Remove unused import or use it properly
+// import { processAudioForTranslation } from '../utils/openaiService';
 
 const TranslationPanel = ({ isTranslating, language }) => {
   const [translations, setTranslations] = useState([]);
@@ -25,8 +26,6 @@ const TranslationPanel = ({ isTranslating, language }) => {
       intervalId = setInterval(async () => {
         try {
           // This would use the actual audio data in production
-          // const translationResult = await processAudioForTranslation(audioData, language);
-          
           // For now, we'll use mock data
           const mockData = {
             original: "This is a test sentence for our translation demo.",

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import logo from '../assets/logo.png';
 
 const Header = ({ isLoggedIn, setIsLoggedIn, user }) => {
   const handleLogout = () => {
@@ -12,7 +11,8 @@ const Header = ({ isLoggedIn, setIsLoggedIn, user }) => {
     <header className="header">
       <div className="logo-container">
         <Link to="/">
-          <img src={logo} alt="LiveTranslate Logo" className="logo" />
+          {/* Replace image with text logo for now */}
+          <div className="text-logo">LT</div>
         </Link>
         <h1>LiveTranslate</h1>
       </div>
