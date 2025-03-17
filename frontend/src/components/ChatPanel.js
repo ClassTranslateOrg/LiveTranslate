@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { translateChatMessage } from '../utils/openaiService';
+import { translateChatMessage, isOpenAIAvailable } from '../utils/openaiService';
 import AuthContext from '../contexts/AuthContext';
 import webRTCService from '../utils/webrtcService';
 
@@ -8,6 +8,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isTranslatingChat, setIsTranslatingChat] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState(true);
+  const [isTranslating, setIsTranslating] = useState(false);
   const messagesEndRef = useRef(null);
   const { user } = useContext(AuthContext);
   
@@ -17,12 +18,26 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
     name: user?.name || user?.email || 'You'
   };
   
-  // Check for OpenAI API key on component mount
+  // Check for OpenAI API availability
   useEffect(() => {
-    if (!process.env.REACT_APP_OPENAI_API_KEY) {
-      console.warn('OpenAI API key not found. Translation service will not work.');
-      setIsApiAvailable(false);
-    }
+    const checkApiAvailability = async () => {
+      // First check if the API key is configured
+      if (!process.env.REACT_APP_OPENAI_API_KEY) {
+        console.warn('OpenAI API key not found. Translation service will not work.');
+        setIsApiAvailable(false);
+        return;
+      }
+      
+      // Then check if we can actually connect to OpenAI
+      const available = await isOpenAIAvailable();
+      setIsApiAvailable(available);
+      
+      if (!available) {
+        console.warn('OpenAI API is not available. Translation will use mock functions.');
+      }
+    };
+    
+    checkApiAvailability();
   }, []);
   
   // Register WebSocket event handlers
@@ -80,7 +95,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
 
   // Handle changes to selected language - translate existing messages when needed
   useEffect(() => {
-    if (isTranslatingChat && selectedLanguage && isApiAvailable) {
+    if (isTranslatingChat && selectedLanguage) {
       const translateMessages = async () => {
         // Only translate messages that don't have translations in this language
         const messagesToTranslate = messages.filter(
@@ -102,6 +117,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
         // Translate each message one by one
         for (const msg of messagesToTranslate) {
           try {
+            setIsTranslating(true);
             const translatedText = await translateChatMessage(msg.text, selectedLanguage);
             
             // Update the message with the translation
@@ -125,18 +141,25 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
             setMessages(prev => 
               prev.map(m => {
                 if (m.id === msg.id) {
-                  return { ...m, isTranslating: false };
+                  return { 
+                    ...m, 
+                    isTranslating: false,
+                    translationError: true,
+                    translated: `[Translation failed: ${error.message}]`
+                  };
                 }
                 return m;
               })
             );
+          } finally {
+            setIsTranslating(false);
           }
         }
       };
       
       translateMessages();
     }
-  }, [isTranslatingChat, selectedLanguage, messages, isApiAvailable]);
+  }, [isTranslatingChat, selectedLanguage, messages]);
   
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -165,7 +188,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
     }
     
     // If translation is enabled, translate the sent message right away
-    if (isTranslatingChat && selectedLanguage && isApiAvailable) {
+    if (isTranslatingChat && selectedLanguage) {
       try {
         // Mark the message as translating
         setMessages(prev => 
@@ -177,6 +200,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
           })
         );
         
+        setIsTranslating(true);
         const translatedText = await translateChatMessage(newMessage, selectedLanguage);
         
         setMessages(prev => 
@@ -199,11 +223,18 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
         setMessages(prev => 
           prev.map(m => {
             if (m.id === messageData.id) {
-              return { ...m, isTranslating: false };
+              return { 
+                ...m, 
+                isTranslating: false,
+                translationError: true,
+                translated: `[Translation failed: ${error.message}]`
+              };
             }
             return m;
           })
         );
+      } finally {
+        setIsTranslating(false);
       }
     }
   };
@@ -221,6 +252,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
             <button 
               className={`translation-toggle ${isTranslatingChat ? 'active' : ''}`}
               onClick={toggleChatTranslation}
+              disabled={isTranslating}
             >
               {isTranslatingChat ? 'Translation ON' : 'Translation OFF'}
             </button>
@@ -229,6 +261,10 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
           )}
         </div>
       </div>
+      
+      {isTranslating && (
+        <div className="translation-status">Translating...</div>
+      )}
       
       <div className="chat-messages">
         {messages.length === 0 ? (
@@ -248,7 +284,7 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
               <div className="message-body">{message.text}</div>
               
               {isTranslatingChat && (
-                <div className="message-translation">
+                <div className={`message-translation ${message.translationError ? 'translation-error' : ''}`}>
                   {message.isTranslating ? (
                     <span className="translating-indicator">Translating...</span>
                   ) : message.translated ? (

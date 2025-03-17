@@ -833,3 +833,25 @@ button:disabled {
 .social-links a:hover {
   text-decoration: underline;
 }
+
+.translation-status {
+  background-color: var(--light-gray);
+  color: var(--primary-color);
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.translation-error {
+  color: var(--danger-color);
+  font-style: italic;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
