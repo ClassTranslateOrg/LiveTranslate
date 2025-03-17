@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-// Remove unused import or use it properly
-// import { processAudioForTranslation } from '../utils/openaiService';
+import { processAudioForTranslation } from '../utils/openaiService';
 
 const TranslationPanel = ({ isTranslating, language }) => {
   const [translations, setTranslations] = useState([]);
   const [isApiAvailable, setIsApiAvailable] = useState(true);
+  const [audioProcessor, setAudioProcessor] = useState(null);
 
   // Check for OpenAI API key on component mount
   useEffect(() => {
@@ -14,51 +14,75 @@ const TranslationPanel = ({ isTranslating, language }) => {
     }
   }, []);
 
-  // Simulating incoming translations
+  // Setup real audio processing when translation starts/stops
   useEffect(() => {
-    if (!isTranslating || !isApiAvailable) return;
+    if (!isTranslating || !isApiAvailable) {
+      // Cleanup any existing audio processor
+      if (audioProcessor) {
+        audioProcessor.stop();
+        setAudioProcessor(null);
+      }
+      return;
+    }
     
-    let intervalId;
-    
-    // In a real implementation, we would process audio and send to OpenAI Whisper
-    // This is a placeholder that mimics that behavior for demonstration
-    const startTranslationProcess = async () => {
-      intervalId = setInterval(async () => {
-        try {
-          // This would use the actual audio data in production
-          // For now, we'll use mock data
-          const mockData = {
-            original: "This is a test sentence for our translation demo.",
-            translated: getTranslatedText(language),
-            timestamp: new Date().toISOString()
-          };
+    // Start capturing audio for translation
+    const startAudioCapture = async () => {
+      try {
+        // Get audio from the microphone
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Set up audio recorder with 5-second intervals
+        const mediaRecorder = new MediaRecorder(stream);
+        let audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          audioChunks = [];
           
-          setTranslations(prev => [...prev, mockData]);
-        } catch (error) {
-          console.error("Error in translation process:", error);
-        }
-      }, 5000);
+          try {
+            // Process the audio with OpenAI
+            const result = await processAudioForTranslation(audioBlob, language);
+            setTranslations(prev => [...prev, result]);
+          } catch (error) {
+            console.error('Error processing audio:', error);
+          }
+          
+          // Start recording again if still translating
+          if (isTranslating) {
+            mediaRecorder.start();
+            setTimeout(() => mediaRecorder.stop(), 5000); // Record in 5-second chunks
+          }
+        };
+        
+        // Start recording
+        mediaRecorder.start();
+        setTimeout(() => mediaRecorder.stop(), 5000); // Record first 5 seconds
+        
+        setAudioProcessor({
+          stop: () => {
+            mediaRecorder.stop();
+            stream.getTracks().forEach(track => track.stop());
+          }
+        });
+      } catch (error) {
+        console.error('Error starting audio capture:', error);
+        setIsApiAvailable(false);
+      }
     };
     
-    startTranslationProcess();
+    startAudioCapture();
     
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      // Cleanup function
+      if (audioProcessor) {
+        audioProcessor.stop();
+      }
     };
   }, [isTranslating, language, isApiAvailable]);
-
-  // Mock function to return translated text based on language
-  const getTranslatedText = (lang) => {
-    const translations = {
-      es: "Esta es una frase de prueba para nuestra demostración de traducción.",
-      fr: "C'est une phrase de test pour notre démonstration de traduction.",
-      de: "Dies ist ein Testsatz für unsere Übersetzungsdemo.",
-      zh: "这是我们翻译演示的测试句子。",
-      ja: "これは翻訳デモのテスト文です。"
-    };
-    
-    return translations[lang] || "Translation not available";
-  };
 
   return (
     <div className="translation-panel">

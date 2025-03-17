@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import TranslationPanel from './TranslationPanel';
 import ChatPanel from './ChatPanel';
+import webRTCService from '../utils/webrtcService';
 
 const Meeting = () => {
   const { id } = useParams();
@@ -9,46 +10,68 @@ const Meeting = () => {
   const [isTranslating, setIsTranslating] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('es');
   const [error, setError] = useState('');
-  const zoomContainerRef = useRef(null);
-  
-  // Join the Zoom meeting
+  const [participants, setParticipants] = useState([]);
+  const localVideoRef = useRef(null);
+  const remoteVideosRef = useRef({});
+
+  // Join the WebRTC meeting
   useEffect(() => {
     if (!id) return;
     
     const joinMeeting = async () => {
       try {
-        // Get Zoom SDK key from .env
-        const sdkKey = process.env.REACT_APP_ZOOM_SDK_KEY;
-        const sdkSecret = process.env.REACT_APP_ZOOM_SDK_SECRET;
+        // Connect to signaling server
+        await webRTCService.connect();
         
-        // Check if we have necessary credentials
-        if (!sdkKey || !sdkSecret) {
-          throw new Error('Zoom SDK credentials are missing. Check your .env file.');
+        // Get local media stream
+        const localStream = await webRTCService.startLocalStream();
+        
+        // Display local video
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
         }
-
-        // For local testing - use a mock signature or generate one
-        // In production, this would come from your backend
-        const mockSignature = "MOCK_SIGNATURE_FOR_LOCAL_DEVELOPMENT";
         
-        // IMPORTANT: Configure Zoom SDK to work with localhost during development
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
-        console.log(`Using API URL: ${apiUrl} for Zoom integration`);
+        // Join the room with meeting ID
+        webRTCService.joinRoom(id);
         
-        const meetingNumber = id;
-        const userName = "Test User"; // Ideally from user input or auth system
-        const passWord = "";
-        const userEmail = "test@example.com"; // Ideally from auth system
+        // Handle remote streams
+        webRTCService.onRemoteStream((userId, stream) => {
+          console.log(`Received stream from user ${userId}`);
+          
+          // Create a new video element for this remote stream
+          if (!remoteVideosRef.current[userId]) {
+            remoteVideosRef.current[userId] = document.createElement('video');
+            remoteVideosRef.current[userId].autoplay = true;
+            remoteVideosRef.current[userId].playsInline = true;
+            remoteVideosRef.current[userId].id = `remote-video-${userId}`;
+            document.getElementById('remote-videos-container').appendChild(remoteVideosRef.current[userId]);
+          }
+          
+          // Set the stream to the video element
+          remoteVideosRef.current[userId].srcObject = stream;
+        });
         
-        await window.zoomClient.join({
-          signature: mockSignature,
-          meetingNumber: meetingNumber,
-          userName: userName,
-          password: passWord,
-          userEmail: userEmail
+        // Track user joining
+        webRTCService.onUserJoined((userId) => {
+          setParticipants(prev => [...prev, userId]);
+        });
+        
+        // Track user leaving
+        webRTCService.onUserLeft((userId) => {
+          setParticipants(prev => prev.filter(id => id !== userId));
+          
+          // Remove video element
+          if (remoteVideosRef.current[userId]) {
+            const videoEl = document.getElementById(`remote-video-${userId}`);
+            if (videoEl) {
+              videoEl.remove();
+            }
+            delete remoteVideosRef.current[userId];
+          }
         });
         
         setIsJoined(true);
-        console.log("Joined the meeting successfully (local testing mode)");
+        console.log("Joined the meeting successfully with WebRTC");
       } catch (error) {
         console.error("Failed to join the meeting", error);
         setError(error.message || 'Failed to join meeting');
@@ -59,11 +82,10 @@ const Meeting = () => {
     
     // Cleanup function
     return () => {
-      if (isJoined) {
-        window.zoomClient.leave();
-      }
+      webRTCService.disconnect();
+      setIsJoined(false);
     };
-  }, [id, isJoined]);
+  }, [id]);
   
   // Setup audio stream for translation
   const startTranslation = () => {
@@ -90,12 +112,17 @@ const Meeting = () => {
       {error && <div className="error-message">{error}</div>}
       
       <div className="video-container">
-        <div id="zoom-container" ref={zoomContainerRef}></div>
+        <div className="local-video-wrapper">
+          <video ref={localVideoRef} autoPlay playsInline muted className="local-video" />
+        </div>
+        <div id="remote-videos-container" className="remote-videos-container">
+          {/* Remote videos will be inserted here dynamically */}
+        </div>
       </div>
       
       {/* Display a local development notice */}
       <div className="local-dev-notice">
-        Running in local development mode (localhost:3000)
+        Running WebRTC on localhost
       </div>
       
       <div className="controls-container">
