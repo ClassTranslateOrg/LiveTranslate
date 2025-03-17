@@ -9,15 +9,54 @@ class WebRTCService {
     this.onRemoteStreamCallbacks = [];
     this.onUserJoinedCallbacks = [];
     this.onUserLeftCallbacks = [];
+    this.connectionFailed = false;
+    this.connectionAttempted = false;
+    
+    // Check if running in GitHub Codespaces
+    this.isGitHubCodespaces = window.location.hostname.includes('github.dev') || 
+                              window.location.hostname.includes('app.github.dev');
   }
 
-  connect(serverUrl = 'http://localhost:3001') {
+  connect(serverUrl = null) {
+    // If we've already tried to connect and failed, don't try again
+    if (this.connectionAttempted && this.connectionFailed) {
+      return Promise.reject(new Error('Previous connection attempt failed, operating in local-only mode'));
+    }
+    
+    this.connectionAttempted = true;
+    
+    // Determine server URL based on environment
+    if (!serverUrl) {
+      if (this.isGitHubCodespaces) {
+        console.log('Running in GitHub Codespaces, switching to local-only mode');
+        this.connectionFailed = true;
+        return Promise.reject(new Error('GitHub Codespaces environment detected, operating in local-only mode'));
+      } else {
+        serverUrl = 'http://localhost:3001';
+      }
+    }
+    
     return new Promise((resolve, reject) => {
       try {
-        this.socket = io(serverUrl);
+        console.log('Attempting to connect to signaling server at:', serverUrl);
+        
+        // Set a connection timeout
+        const timeout = setTimeout(() => {
+          console.warn('Socket connection timeout');
+          this.connectionFailed = true;
+          reject(new Error('Connection timeout - server may be down'));
+        }, 3000); // Reduced timeout for better UX
+        
+        this.socket = io(serverUrl, {
+          reconnectionAttempts: 2, // Reduced reconnection attempts
+          timeout: 3000,
+          forceNew: true
+        });
 
         this.socket.on('connect', () => {
+          clearTimeout(timeout);
           console.log('Connected to signaling server');
+          this.connectionFailed = false;
           resolve(this.socket.id);
         });
 
@@ -41,11 +80,29 @@ class WebRTCService {
         });
 
         this.socket.on('connect_error', (err) => {
+          clearTimeout(timeout);
           console.error('Socket connection error:', err);
+          this.connectionFailed = true;
+          
+          // Disconnect socket to prevent continuous reconnection attempts
+          if (this.socket) {
+            this.socket.disconnect();
+          }
+          
           reject(err);
         });
+        
+        this.socket.on('disconnect', (reason) => {
+          console.warn('Socket disconnected:', reason);
+          if (reason === 'io server disconnect') {
+            // Server disconnected us, try to reconnect
+            this.socket.connect();
+          }
+        });
+        
       } catch (error) {
         console.error('Error connecting to signaling server:', error);
+        this.connectionFailed = true;
         reject(error);
       }
     });
@@ -65,10 +122,12 @@ class WebRTCService {
   }
 
   joinRoom(roomId) {
-    if (!this.socket) {
-      throw new Error('Not connected to signaling server');
+    if (!this.socket || this.connectionFailed) {
+      console.warn('Not connected to signaling server, operating in local-only mode');
+      return false;
     }
     this.socket.emit('join-room', roomId);
+    return true;
   }
 
   addPeer(userId, initiator) {
@@ -131,10 +190,14 @@ class WebRTCService {
     });
     this.peers = {};
 
-    if (this.socket) {
+    if (this.socket && !this.connectionFailed) {
       this.socket.disconnect();
       this.socket = null;
     }
+  }
+  
+  isConnected() {
+    return this.socket && this.socket.connected && !this.connectionFailed;
   }
 }
 

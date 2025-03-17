@@ -449,3 +449,39 @@ button:disabled {
   font-weight: bold;
   font-size: 0.9rem;
 }
+
+/* Add warning message style */
+.warning-message {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  border: 1px solid #ffeeba;
+}
+
+.connecting-message, .local-only-message {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 10px 20px;
+  border-radius: 4px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.local-only-message {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* GitHub Codespaces specific styles */
+.github-codespaces-notice {
+  background-color: #3182ce;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}

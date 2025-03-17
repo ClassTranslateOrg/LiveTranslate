@@ -10,9 +10,14 @@ const Meeting = () => {
   const [isTranslating, setIsTranslating] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('es');
   const [error, setError] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [participants, setParticipants] = useState([]);
   const localVideoRef = useRef(null);
   const remoteVideosRef = useRef({});
+  
+  // Check if running in GitHub Codespaces
+  const isGitHubCodespaces = window.location.hostname.includes('github.dev') || 
+                             window.location.hostname.includes('app.github.dev');
 
   // Join the WebRTC meeting
   useEffect(() => {
@@ -20,10 +25,23 @@ const Meeting = () => {
     
     const joinMeeting = async () => {
       try {
-        // Connect to signaling server
-        await webRTCService.connect();
+        setConnectionStatus('connecting');
         
-        // Get local media stream
+        // Skip server connection if in GitHub Codespaces
+        if (isGitHubCodespaces) {
+          console.log('GitHub Codespaces detected, using local-only mode');
+          setConnectionStatus('local-only');
+        } else {
+          // Connect to signaling server
+          await webRTCService.connect()
+            .catch(err => {
+              console.warn('Signaling server connection failed, continuing in local-only mode', err);
+              setConnectionStatus('local-only');
+              return null;
+            });
+        }
+        
+        // Get local media stream even if server connection failed
         const localStream = await webRTCService.startLocalStream();
         
         // Display local video
@@ -31,8 +49,13 @@ const Meeting = () => {
           localVideoRef.current.srcObject = localStream;
         }
         
-        // Join the room with meeting ID
-        webRTCService.joinRoom(id);
+        // Join the room with meeting ID if connection succeeded
+        if (!isGitHubCodespaces) {
+          const joinSuccess = webRTCService.joinRoom(id);
+          if (joinSuccess) {
+            setConnectionStatus('connected');
+          }
+        }
         
         // Handle remote streams
         webRTCService.onRemoteStream((userId, stream) => {
@@ -44,7 +67,11 @@ const Meeting = () => {
             remoteVideosRef.current[userId].autoplay = true;
             remoteVideosRef.current[userId].playsInline = true;
             remoteVideosRef.current[userId].id = `remote-video-${userId}`;
-            document.getElementById('remote-videos-container').appendChild(remoteVideosRef.current[userId]);
+            
+            const container = document.getElementById('remote-videos-container');
+            if (container) {
+              container.appendChild(remoteVideosRef.current[userId]);
+            }
           }
           
           // Set the stream to the video element
@@ -71,10 +98,11 @@ const Meeting = () => {
         });
         
         setIsJoined(true);
-        console.log("Joined the meeting successfully with WebRTC");
+        console.log("Joined the meeting successfully");
       } catch (error) {
         console.error("Failed to join the meeting", error);
-        setError(error.message || 'Failed to join meeting');
+        setError(`Media error: ${error.message || 'Could not access camera/mic'}`);
+        setConnectionStatus('failed');
       }
     };
     
@@ -85,7 +113,7 @@ const Meeting = () => {
       webRTCService.disconnect();
       setIsJoined(false);
     };
-  }, [id]);
+  }, [id, isGitHubCodespaces]);
   
   // Setup audio stream for translation
   const startTranslation = () => {
@@ -97,19 +125,30 @@ const Meeting = () => {
       console.error("OpenAI API key is missing. Check your .env file.");
       setError("OpenAI API key is missing. Translation unavailable.");
       setIsTranslating(false);
-      return;
     }
-    // Implementation will go here
   };
   
   const stopTranslation = () => {
     setIsTranslating(false);
-    // Stop the translation process
   };
 
   return (
     <div className="meeting-container">
       {error && <div className="error-message">{error}</div>}
+      
+      {isGitHubCodespaces && (
+        <div className="warning-message">
+          <strong>GitHub Codespaces Environment Detected:</strong> Running in local-only mode.
+          Multi-participant video conferencing requires running the application locally.
+        </div>
+      )}
+      
+      {connectionStatus === 'local-only' && !isGitHubCodespaces && (
+        <div className="warning-message">
+          Running in local-only mode. Signaling server not available. 
+          Video conferencing with other participants won't work.
+        </div>
+      )}
       
       <div className="video-container">
         <div className="local-video-wrapper">
@@ -117,12 +156,18 @@ const Meeting = () => {
         </div>
         <div id="remote-videos-container" className="remote-videos-container">
           {/* Remote videos will be inserted here dynamically */}
+          {connectionStatus === 'connecting' && (
+            <div className="connecting-message">Connecting to server...</div>
+          )}
+          {connectionStatus === 'local-only' && (
+            <div className="local-only-message">Local video only mode</div>
+          )}
         </div>
       </div>
       
       {/* Display a local development notice */}
       <div className="local-dev-notice">
-        Running WebRTC on localhost
+        {isGitHubCodespaces ? 'Running in GitHub Codespaces' : 'Running locally'} - Meeting ID: {id}
       </div>
       
       <div className="controls-container">

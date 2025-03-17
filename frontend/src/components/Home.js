@@ -36,8 +36,8 @@ const Home = ({ isLoggedIn }) => {
   return (
     <div className="home-container">
       <div className="hero-section">
-        <h1>Live Translation for Video Meetings</h1>
-        <p>Connect with anyone, anywhere, in any language with real-time translation powered by AI.</p>
+        <h1>Translation for Video Meetings</h1>
+        <p>AI for teacher</p>
       </div>
       
       <div className="meeting-actions">
@@ -79,15 +79,15 @@ const Home = ({ isLoggedIn }) => {
         <div className="features-grid">
           <div className="feature">
             <h3>Live Translation</h3>
-            <p>Real-time translation powered by OpenAI's Whisper in multiple languages</p>
+            <p>OpenAI's Whisper</p>
           </div>
           <div className="feature">
             <h3>High Quality Video</h3>
-            <p>Crystal clear video and audio through Zoom SDK integration</p>
+            <p>N/A</p>
           </div>
           <div className="feature">
             <h3>Built-In Chat</h3>
-            <p>Text with participants during your meeting</p>
+            <p>N/A</p>
           </div>
         </div>
       </div>
