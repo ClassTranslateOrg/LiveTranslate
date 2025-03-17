@@ -8,6 +8,8 @@ import Home from './components/Home';
 import Meeting from './components/Meeting';
 import Login from './components/Login';
 import Register from './components/Register';
+import About from './components/About';
+import Contact from './components/Contact';
 import NotFound from './components/NotFound';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -23,6 +25,8 @@ function App() {
               <Route path="/meeting/:id" element={<Meeting />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>

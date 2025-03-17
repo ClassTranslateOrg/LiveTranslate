@@ -16,7 +16,7 @@ const Register = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   
-  const { signUp, confirmSignUp, signInWithGoogle } = useContext(AuthContext);
+  const { signInWithGoogle } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -47,53 +47,29 @@ const Register = () => {
     }
 
     try {
-      const result = await signUp(username, password, email, name);
+      // For now, just redirect to the AWS Cognito hosted UI
+      const apiUrl = process.env.REACT_APP_API_URL || 
+        (process.env.NODE_ENV === 'production' ? 'https://api.live-translate.org' : 'http://localhost:3001');
       
-      if (result.success) {
-        setIsVerifying(true);
-      } else {
-        setError(result.error || 'Registration failed');
-      }
+      window.location.href = `${apiUrl}/auth/login?redirect=${encodeURIComponent(window.location.origin)}`;
     } catch (error) {
       setError('An unexpected error occurred. Please try again.');
       console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerification = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    if (!verificationCode) {
-      setError('Verification code is required');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const result = await confirmSignUp(formData.username, verificationCode);
-      
-      if (result.success) {
-        // Redirect to login page after successful verification
-        navigate('/login', { 
-          state: { message: 'Registration successful! Please log in.' } 
-        });
-      } else {
-        setError(result.error || 'Verification failed');
-      }
-    } catch (error) {
-      setError('An unexpected error occurred. Please try again.');
-      console.error(error);
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = () => {
-    signInWithGoogle();
+    // Use the signInWithGoogle function from context if available
+    if (typeof signInWithGoogle === 'function') {
+      signInWithGoogle();
+    } else {
+      // Fallback for when the context function isn't available
+      const apiUrl = process.env.REACT_APP_API_URL || 
+        (process.env.NODE_ENV === 'production' ? 'https://api.live-translate.org' : 'http://localhost:3001');
+      
+      window.location.href = `${apiUrl}/auth/login?redirect=${encodeURIComponent(window.location.origin)}`;
+    }
   };
 
   return (
@@ -189,7 +165,7 @@ const Register = () => {
             </button>
           </>
         ) : (
-          <form onSubmit={handleVerification} className="auth-form">
+          <form onSubmit={(e) => e.preventDefault()} className="auth-form">
             <div className="form-group">
               <label htmlFor="verificationCode">Verification Code</label>
               <input
