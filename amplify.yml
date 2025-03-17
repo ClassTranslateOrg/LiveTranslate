@@ -9,7 +9,8 @@ frontend:
     preBuild:
       commands:
         - cd frontend
-        - npm ci
+        # Check if package-lock.json exists, if not use npm install instead of npm ci
+        - if [ -f "package-lock.json" ]; then npm ci; else npm install; fi
     build:
       commands:
         - echo "Configuring environment variables..."
