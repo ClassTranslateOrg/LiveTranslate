@@ -1,4 +1,9 @@
 version: 1
+backend:
+  phases:
+    build:
+      commands:
+        - echo "No backend build commands required yet"
 frontend:
   phases:
     preBuild:
@@ -7,6 +12,17 @@ frontend:
         - npm ci
     build:
       commands:
+        - echo "Configuring environment variables..."
+        # Create runtime env config to be used by the React app
+        - |
+          cat > .env << EOL
+          REACT_APP_API_URL=$REACT_APP_API_URL
+          REACT_APP_OPENAI_API_KEY=$REACT_APP_OPENAI_API_KEY
+          REACT_APP_AWS_REGION=$REACT_APP_AWS_REGION
+          REACT_APP_USER_POOL_ID=$REACT_APP_USER_POOL_ID
+          REACT_APP_USER_POOL_CLIENT_ID=$REACT_APP_USER_POOL_CLIENT_ID
+          REACT_APP_DOMAIN=$REACT_APP_DOMAIN
+          EOL
         - npm run build
   artifacts:
     baseDirectory: frontend/build
@@ -16,3 +32,12 @@ frontend:
     paths:
       - node_modules/**/*
       - frontend/node_modules/**/*
+  customHeaders:
+    - pattern: '**/*'
+      headers:
+        - key: 'Cache-Control'
+          value: 'public, max-age=0, must-revalidate'
+    - pattern: 'static/**/*'
+      headers:
+        - key: 'Cache-Control'
+          value: 'public, max-age=31536000, immutable'

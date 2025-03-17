@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { processAudioForTranslation } from '../utils/openaiService';
+import AuthContext from '../contexts/AuthContext';
+import webRTCService from '../utils/webrtcService';
 
 const TranslationPanel = ({ isTranslating, language }) => {
   const [translations, setTranslations] = useState([]);
   const [isApiAvailable, setIsApiAvailable] = useState(true);
   const [audioProcessor, setAudioProcessor] = useState(null);
+  const [remoteTranslations, setRemoteTranslations] = useState({});
+  const { user } = useContext(AuthContext);
 
   // Check for OpenAI API key on component mount
   useEffect(() => {
@@ -14,18 +18,40 @@ const TranslationPanel = ({ isTranslating, language }) => {
     }
   }, []);
 
-  // Setup real audio processing when translation starts/stops
+  // Setup WebRTC event listeners for remote translations
+  useEffect(() => {
+    if (!webRTCService.isConnected()) return;
+
+    // Handle remote translations
+    const handleTranslationResult = (userId, translationData) => {
+      // Update the remote translations state
+      setRemoteTranslations(prev => ({
+        ...prev,
+        [userId]: [...(prev[userId] || []), translationData]
+      }));
+    };
+
+    // Register the callback
+    webRTCService.onTranslationResult(handleTranslationResult);
+
+    // Clean up on unmount
+    return () => {
+      // There's no way to remove specific callbacks with our current implementation
+      // In a production app, we would implement a removeListener method
+    };
+  }, []);
+
+  // Handle audio translation when isTranslating changes
   useEffect(() => {
     if (!isTranslating || !isApiAvailable) {
-      // Cleanup any existing audio processor
+      // Stop translation if necessary
       if (audioProcessor) {
         audioProcessor.stop();
         setAudioProcessor(null);
       }
       return;
     }
-    
-    // Start capturing audio for translation
+
     const startAudioCapture = async () => {
       try {
         // Get audio from the microphone
@@ -46,7 +72,14 @@ const TranslationPanel = ({ isTranslating, language }) => {
           try {
             // Process the audio with OpenAI
             const result = await processAudioForTranslation(audioBlob, language);
+            
+            // Add to local translations
             setTranslations(prev => [...prev, result]);
+            
+            // Share with others in the room if connected
+            if (webRTCService.isConnected()) {
+              webRTCService.sendTranslationResult(result);
+            }
           } catch (error) {
             console.error('Error processing audio:', error);
           }
@@ -84,6 +117,12 @@ const TranslationPanel = ({ isTranslating, language }) => {
     };
   }, [isTranslating, language, isApiAvailable]);
 
+  // Combine local and remote translations
+  const allTranslations = [
+    ...translations,
+    ...Object.values(remoteTranslations).flat()
+  ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
   return (
     <div className="translation-panel">
       <h3>Live Translation</h3>
@@ -94,12 +133,12 @@ const TranslationPanel = ({ isTranslating, language }) => {
       )}
       
       <div className="translations-container">
-        {translations.length === 0 && !isTranslating ? (
+        {allTranslations.length === 0 && !isTranslating ? (
           <p>Start translation to see content here</p>
-        ) : translations.length === 0 && isTranslating ? (
+        ) : allTranslations.length === 0 && isTranslating ? (
           <p>Waiting for speech to translate...</p>
         ) : (
-          translations.map((item, index) => (
+          allTranslations.map((item, index) => (
             <div key={index} className="translation-item">
               <div className="original-text">{item.original}</div>
               <div className="translated-text">{item.translated}</div>

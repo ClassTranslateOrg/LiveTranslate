@@ -65,6 +65,39 @@ export const processAudioForTranslation = async (audioBlob, targetLanguage) => {
 };
 
 /**
+ * Translate chat message text
+ * @param {string} text - The text to translate
+ * @param {string} targetLanguage - The target language code
+ * @returns {Promise<string>} The translated text
+ */
+export const translateChatMessage = async (text, targetLanguage) => {
+  if (!text || text.trim() === '') {
+    return '';
+  }
+  
+  try {
+    const translationResponse = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are a translator. Translate the following text to ${getLanguageName(targetLanguage)}.`,
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ],
+    });
+
+    return translationResponse.choices[0].message.content;
+  } catch (error) {
+    console.error('Chat translation error:', error);
+    throw error;
+  }
+};
+
+/**
  * Get the language name from the language code
  */
 function getLanguageName(languageCode) {

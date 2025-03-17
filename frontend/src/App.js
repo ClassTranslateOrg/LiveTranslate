@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 
@@ -6,25 +6,29 @@ import './App.css';
 import Header from './components/Header';
 import Home from './components/Home';
 import Meeting from './components/Meeting';
+import Login from './components/Login';
+import Register from './components/Register';
 import NotFound from './components/NotFound';
+import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState({ name: 'Guest User' });
-
   return (
-    <Router>
-      <div className="App">
-        <Header isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} user={user} />
-        <div className="container">
-          <Routes>
-            <Route path="/" element={<Home isLoggedIn={isLoggedIn} />} />
-            <Route path="/meeting/:id" element={<Meeting />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+    <AuthProvider>
+      <Router>
+        <div className="App">
+          <Header />
+          <div className="container">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/meeting/:id" element={<Meeting />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
         </div>
-      </div>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 

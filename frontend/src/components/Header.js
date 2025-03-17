@@ -1,17 +1,18 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
+import AuthContext from '../contexts/AuthContext';
 
-const Header = ({ isLoggedIn, setIsLoggedIn, user }) => {
+const Header = () => {
+  const { isAuthenticated, user, signOut, isLoading } = useContext(AuthContext);
+
   const handleLogout = () => {
-    // Handle logout logic
-    setIsLoggedIn(false);
+    signOut();
   };
 
   return (
     <header className="header">
       <div className="logo-container">
         <Link to="/">
-          {/* Replace image with text logo for now */}
           <div className="text-logo">LT</div>
         </Link>
         <h1>LiveTranslate</h1>
@@ -24,9 +25,11 @@ const Header = ({ isLoggedIn, setIsLoggedIn, user }) => {
         </ul>
       </nav>
       <div className="auth-buttons">
-        {isLoggedIn ? (
+        {isLoading ? (
+          <span>Loading...</span>
+        ) : isAuthenticated ? (
           <>
-            <span className="user-name">Hello, {user?.name}</span>
+            <span className="user-name">Hello, {user?.attributes?.name || user?.username}</span>
             <button className="logout-btn" onClick={handleLogout}>Logout</button>
           </>
         ) : (

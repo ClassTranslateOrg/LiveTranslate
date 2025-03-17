@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import TranslationPanel from './TranslationPanel';
 import ChatPanel from './ChatPanel';
 import webRTCService from '../utils/webrtcService';
+import videoConferenceService from '../utils/videoConferenceService';
 
 const Meeting = () => {
   const { id } = useParams();
@@ -19,7 +20,7 @@ const Meeting = () => {
   const isGitHubCodespaces = window.location.hostname.includes('github.dev') || 
                              window.location.hostname.includes('app.github.dev');
 
-  // Join the WebRTC meeting
+  // Join the meeting
   useEffect(() => {
     if (!id) return;
     
@@ -27,35 +28,25 @@ const Meeting = () => {
       try {
         setConnectionStatus('connecting');
         
-        // Skip server connection if in GitHub Codespaces
-        if (isGitHubCodespaces) {
-          console.log('GitHub Codespaces detected, using local-only mode');
+        // Initialize conference
+        const result = await videoConferenceService.initializeConference();
+        
+        if (!result.success) {
           setConnectionStatus('local-only');
+          console.warn('Failed to connect to signaling server, continuing in local-only mode');
         } else {
-          // Connect to signaling server
-          await webRTCService.connect()
-            .catch(err => {
-              console.warn('Signaling server connection failed, continuing in local-only mode', err);
-              setConnectionStatus('local-only');
-              return null;
-            });
+          setConnectionStatus('connected');
+        }
+
+        // Display local video if we have a stream
+        if (result.localStream && localVideoRef.current) {
+          localVideoRef.current.srcObject = result.localStream;
         }
         
-        // Get local media stream even if server connection failed
-        const localStream = await webRTCService.startLocalStream();
-        
-        // Display local video
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
-        }
-        
-        // Join the room with meeting ID if connection succeeded
-        if (!isGitHubCodespaces) {
-          const joinSuccess = webRTCService.joinRoom(id);
-          if (joinSuccess) {
-            setConnectionStatus('connected');
-          }
-        }
+        // Join the room with meeting ID
+        videoConferenceService.joinMeeting(id, {
+          language: selectedLanguage
+        });
         
         // Handle remote streams
         webRTCService.onRemoteStream((userId, stream) => {
@@ -110,10 +101,17 @@ const Meeting = () => {
     
     // Cleanup function
     return () => {
-      webRTCService.disconnect();
+      videoConferenceService.leaveMeeting();
       setIsJoined(false);
     };
   }, [id, isGitHubCodespaces]);
+  
+  // Update language in WebRTC service when selected language changes
+  useEffect(() => {
+    if (isJoined) {
+      webRTCService.setLanguage(selectedLanguage);
+    }
+  }, [selectedLanguage, isJoined]);
   
   // Setup audio stream for translation
   const startTranslation = () => {
@@ -165,9 +163,9 @@ const Meeting = () => {
         </div>
       </div>
       
-      {/* Display a local development notice */}
+      {/* Display environment notice */}
       <div className="local-dev-notice">
-        {isGitHubCodespaces ? 'Running in GitHub Codespaces' : 'Running locally'} - Meeting ID: {id}
+        {process.env.NODE_ENV !== 'production' ? 'Development Environment' : 'Production'} - Meeting ID: {id}
       </div>
       
       <div className="controls-container">
@@ -198,7 +196,10 @@ const Meeting = () => {
           isTranslating={isTranslating} 
           language={selectedLanguage} 
         />
-        <ChatPanel meetingId={id} />
+        <ChatPanel 
+          meetingId={id} 
+          selectedLanguage={selectedLanguage} 
+        />
       </div>
     </div>
   );
