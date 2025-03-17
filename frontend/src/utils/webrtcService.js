@@ -12,6 +12,8 @@ class WebRTCService {
     this.onChatMessageCallbacks = [];
     this.onTranslationResultCallbacks = [];
     this.onLanguageChangedCallbacks = [];
+    this.onScreenShareSignalCallbacks = [];
+    this.onScreenSharingStatusCallbacks = [];
     this.connectionFailed = false;
     this.connectionAttempted = false;
     this.userData = {
@@ -50,7 +52,13 @@ class WebRTCService {
       } else if (process.env.REACT_APP_API_URL) {
         serverUrl = process.env.REACT_APP_API_URL;
       } else if (process.env.NODE_ENV === 'production') {
-        serverUrl = 'https://api.live-translate.org';
+        // Try both https and http versions as fallbacks
+        const domain = 'api.live-translate.org';
+        if (this.isUrlReachable(`https://${domain}`)) {
+          serverUrl = `https://${domain}`;
+        } else {
+          serverUrl = `http://${domain}`;
+        }
       } else {
         serverUrl = 'http://localhost:3001';
       }
@@ -70,7 +78,8 @@ class WebRTCService {
         this.socket = io(serverUrl, {
           reconnectionAttempts: 3,
           timeout: 5000,
-          withCredentials: true
+          withCredentials: true,
+          transports: ['websocket', 'polling'] // Try WebSocket first, fall back to polling
         });
 
         this.socket.on('connect', () => {
@@ -78,58 +87,6 @@ class WebRTCService {
           console.log('Connected to signaling server');
           this.connectionFailed = false;
           resolve(this.socket.id);
-        });
-
-        this.socket.on('room-users', (users) => {
-          console.log('Existing users in room:', users);
-          users.forEach(user => {
-            this.onUserJoinedCallbacks.forEach(callback => 
-              callback(user.userId, user.userData)
-            );
-            this.addPeer(user.userId, true);
-          });
-        });
-
-        this.socket.on('user-joined', (data) => {
-          const { userId, userData } = data;
-          console.log(`User joined: ${userId}`, userData);
-          this.onUserJoinedCallbacks.forEach(callback => callback(userId, userData));
-          this.addPeer(userId, false);
-        });
-
-        this.socket.on('user-left', (userId) => {
-          console.log(`User left: ${userId}`);
-          this.onUserLeftCallbacks.forEach(callback => callback(userId));
-          this.removePeer(userId);
-        });
-
-        this.socket.on('signal', (data) => {
-          console.log(`Signal received from ${data.userId}`);
-          if (!this.peers[data.userId]) {
-            this.addPeer(data.userId, false);
-          }
-          this.peers[data.userId].signal(data.signal);
-        });
-        
-        this.socket.on('chat-message', (data) => {
-          console.log(`Chat message from ${data.userId}:`, data.message);
-          this.onChatMessageCallbacks.forEach(callback => 
-            callback(data.userId, data.message)
-          );
-        });
-
-        this.socket.on('user-language-changed', (data) => {
-          console.log(`User ${data.userId} changed language to ${data.language}`);
-          this.onLanguageChangedCallbacks.forEach(callback => 
-            callback(data.userId, data.language)
-          );
-        });
-        
-        this.socket.on('translation-result', (data) => {
-          console.log(`Translation result from ${data.userId}:`, data);
-          this.onTranslationResultCallbacks.forEach(callback => 
-            callback(data.userId, data)
-          );
         });
 
         this.socket.on('connect_error', (err) => {
@@ -144,7 +101,8 @@ class WebRTCService {
           
           reject(err);
         });
-                
+
+        // Handle disconnect that might happen later
         this.socket.on('disconnect', (reason) => {
           console.warn('Socket disconnected:', reason);
           if (reason === 'io server disconnect') {
@@ -152,6 +110,9 @@ class WebRTCService {
             this.socket.connect();
           }
         });
+
+        // Socket event handlers
+        this.setupSocketEventHandlers();
         
       } catch (error) {
         console.error('Error connecting to signaling server:', error);
@@ -161,12 +122,117 @@ class WebRTCService {
     });
   }
 
+  // Helper method to check if a URL is reachable
+  isUrlReachable(url) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('HEAD', `${url}/api/health`, false);
+      xhr.send();
+      return xhr.status >= 200 && xhr.status < 300;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  setupSocketEventHandlers() {
+    if (!this.socket) return;
+
+    this.socket.on('room-users', (users) => {
+      console.log('Existing users in room:', users);
+      users.forEach(user => {
+        this.onUserJoinedCallbacks.forEach(callback => 
+          callback(user.userId, user.userData)
+        );
+        this.addPeer(user.userId, true);
+      });
+    });
+
+    this.socket.on('user-joined', (data) => {
+      const { userId, userData } = data;
+      console.log(`User joined: ${userId}`, userData);
+      this.onUserJoinedCallbacks.forEach(callback => callback(userId, userData));
+      this.addPeer(userId, false);
+    });
+
+    this.socket.on('user-left', (userId) => {
+      console.log(`User left: ${userId}`);
+      this.onUserLeftCallbacks.forEach(callback => callback(userId));
+      this.removePeer(userId);
+    });
+
+    this.socket.on('signal', (data) => {
+      console.log(`Signal received from ${data.userId}`);
+      if (!this.peers[data.userId]) {
+        this.addPeer(data.userId, false);
+      }
+      this.peers[data.userId].signal(data.signal);
+    });
+    
+    this.socket.on('chat-message', (data) => {
+      console.log(`Chat message from ${data.userId}:`, data.message);
+      this.onChatMessageCallbacks.forEach(callback => 
+        callback(data.userId, data.message)
+      );
+    });
+
+    this.socket.on('user-language-changed', (data) => {
+      console.log(`User ${data.userId} changed language to ${data.language}`);
+      this.onLanguageChangedCallbacks.forEach(callback => 
+        callback(data.userId, data.language)
+      );
+    });
+    
+    this.socket.on('translation-result', (data) => {
+      console.log(`Translation result from ${data.userId}:`, data);
+      this.onTranslationResultCallbacks.forEach(callback => 
+        callback(data.userId, data)
+      );
+    });
+
+    // Screen sharing handlers
+    this.socket.on('screen-share-signal', (data) => {
+      console.log(`Screen share signal from ${data.userId}:`, data);
+      this.onScreenShareSignalCallbacks.forEach(callback => 
+        callback(data.userId, data)
+      );
+    });
+
+    this.socket.on('screen-sharing-status', (data) => {
+      console.log(`Screen sharing status from ${data.userId}:`, data.isSharing);
+      this.onScreenSharingStatusCallbacks.forEach(callback => 
+        callback(data.userId, data.isSharing)
+      );
+    });
+  }
+
   async startLocalStream() {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+      // First try to get both video and audio
+      try {
+        this.localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+      } catch (fullMediaError) {
+        console.warn('Could not get both camera and microphone, trying with just camera:', fullMediaError);
+        
+        // Try with just video
+        try {
+          this.localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+        } catch (videoOnlyError) {
+          console.warn('Could not get camera, trying with just audio:', videoOnlyError);
+          
+          // Try with just audio
+          this.localStream = await navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: true
+          });
+        }
+      }
+      
       return this.localStream;
     } catch (error) {
       console.error('Error accessing media devices:', error);
@@ -214,6 +280,25 @@ class WebRTCService {
     return true;
   }
 
+  // Screen sharing methods
+  sendScreenShareSignal(data) {
+    if (!this.socket || this.connectionFailed) {
+      return false;
+    }
+    
+    this.socket.emit('screen-share-signal', data);
+    return true;
+  }
+
+  sendScreenSharingStatus(isSharing) {
+    if (!this.socket || this.connectionFailed) {
+      return false;
+    }
+    
+    this.socket.emit('screen-sharing-status', isSharing);
+    return true;
+  }
+
   addPeer(userId, initiator) {
     try {
       console.log(`Adding peer ${userId}, initiator: ${initiator}`);
@@ -221,15 +306,23 @@ class WebRTCService {
       const peer = new SimplePeer({
         initiator,
         stream: this.localStream,
-        trickle: true
+        trickle: true,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        }
       });
 
       peer.on('signal', signal => {
         console.log(`Sending signal to ${userId}`);
-        this.socket.emit('signal', {
-          userId,
-          signal
-        });
+        if (this.socket && !this.connectionFailed) {
+          this.socket.emit('signal', {
+            userId,
+            signal
+          });
+        }
       });
 
       peer.on('stream', stream => {
@@ -279,6 +372,15 @@ class WebRTCService {
   
   onLanguageChanged(callback) {
     this.onLanguageChangedCallbacks.push(callback);
+  }
+
+  // Screen sharing callbacks
+  onScreenShareSignal(callback) {
+    this.onScreenShareSignalCallbacks.push(callback);
+  }
+
+  onScreenSharingStatus(callback) {
+    this.onScreenSharingStatusCallbacks.push(callback);
   }
 
   disconnect() {

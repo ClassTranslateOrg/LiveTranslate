@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import TranslationPanel from './TranslationPanel';
 import ChatPanel from './ChatPanel';
+import TroubleshootingGuide from './TroubleshootingGuide';
 import webRTCService from '../utils/webrtcService';
 import videoConferenceService from '../utils/videoConferenceService';
 
@@ -13,8 +14,12 @@ const Meeting = () => {
   const [error, setError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [participants, setParticipants] = useState([]);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState(null);
   const localVideoRef = useRef(null);
+  const screenShareRef = useRef(null);
   const remoteVideosRef = useRef({});
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   
   // Check if running in GitHub Codespaces
   const isGitHubCodespaces = window.location.hostname.includes('github.dev') || 
@@ -69,6 +74,12 @@ const Meeting = () => {
           remoteVideosRef.current[userId].srcObject = stream;
         });
         
+        // Handle screen share signals
+        webRTCService.onScreenShareSignal && webRTCService.onScreenShareSignal((userId, data) => {
+          console.log(`Received screen share signal from user ${userId}`, data);
+          // You can handle incoming screen shares here if needed
+        });
+        
         // Track user joining
         webRTCService.onUserJoined((userId) => {
           setParticipants(prev => [...prev, userId]);
@@ -101,6 +112,7 @@ const Meeting = () => {
     
     // Cleanup function
     return () => {
+      stopScreenSharing();
       videoConferenceService.leaveMeeting();
       setIsJoined(false);
     };
@@ -129,6 +141,76 @@ const Meeting = () => {
   const stopTranslation = () => {
     setIsTranslating(false);
   };
+  
+  // Start screen sharing
+  const startScreenSharing = async () => {
+    try {
+      // Request screen sharing stream from the browser
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+      
+      // Set local screen sharing state
+      setIsScreenSharing(true);
+      setScreenStream(stream);
+      
+      // Display screen share in the local reference
+      if (screenShareRef.current) {
+        screenShareRef.current.srcObject = stream;
+      }
+      
+      // Send screen share to peers if connected
+      if (webRTCService.isConnected()) {
+        // Notify others we're sharing our screen
+        webRTCService.sendScreenSharingStatus(true);
+        
+        // Share the screen with all peers
+        for (const peerId in webRTCService.peers) {
+          try {
+            // Add the screen share track to each peer connection
+            stream.getTracks().forEach(track => {
+              webRTCService.peers[peerId].addTrack(track, stream);
+            });
+          } catch (err) {
+            console.error(`Error sharing screen with peer ${peerId}:`, err);
+          }
+        }
+      }
+      
+      // Handle the end of screen sharing
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenSharing();
+      };
+      
+    } catch (err) {
+      console.error("Error starting screen sharing:", err);
+      setError(`Screen sharing error: ${err.message || 'Could not access screen'}`);
+      setIsScreenSharing(false);
+    }
+  };
+  
+  // Stop screen sharing
+  const stopScreenSharing = () => {
+    if (screenStream) {
+      // Stop all tracks in the screen share stream
+      screenStream.getTracks().forEach(track => track.stop());
+      
+      // Clear screen share reference
+      if (screenShareRef.current) {
+        screenShareRef.current.srcObject = null;
+      }
+      
+      // Update state
+      setScreenStream(null);
+      setIsScreenSharing(false);
+      
+      // Notify peers we've stopped sharing our screen
+      if (webRTCService.isConnected()) {
+        webRTCService.sendScreenSharingStatus(false);
+      }
+    }
+  };
 
   return (
     <div className="meeting-container">
@@ -145,6 +227,16 @@ const Meeting = () => {
         <div className="warning-message">
           Running in local-only mode. Signaling server not available. 
           Video conferencing with other participants won't work.
+          <br />
+          <strong>Troubleshooting:</strong> Make sure the server is running at {process.env.REACT_APP_API_URL || 'http://localhost:3001'}
+          and that you have proper DNS resolution if using a custom domain.
+          <button 
+            className="troubleshooting-button" 
+            onClick={() => setShowTroubleshooting(true)}
+            style={{ marginLeft: '10px' }}
+          >
+            Show Troubleshooting Guide
+          </button>
         </div>
       )}
       
@@ -153,6 +245,19 @@ const Meeting = () => {
           <video ref={localVideoRef} autoPlay playsInline muted className="local-video" />
         </div>
         <div id="remote-videos-container" className="remote-videos-container">
+          {/* Screen share video */}
+          {isScreenSharing && (
+            <div className="screen-share-container">
+              <video 
+                ref={screenShareRef} 
+                autoPlay 
+                playsInline 
+                className="screen-share-video" 
+              />
+              <div className="screen-share-label">Your Screen Share</div>
+            </div>
+          )}
+          
           {/* Remote videos will be inserted here dynamically */}
           {connectionStatus === 'connecting' && (
             <div className="connecting-message">Connecting to server...</div>
@@ -175,6 +280,14 @@ const Meeting = () => {
           disabled={!!error}
         >
           {isTranslating ? 'Stop Translation' : 'Start Translation'}
+        </button>
+        
+        <button
+          className={`screen-share-btn ${isScreenSharing ? 'active' : ''}`}
+          onClick={isScreenSharing ? stopScreenSharing : startScreenSharing}
+          disabled={!!error}
+        >
+          {isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
         </button>
         
         <select 
@@ -201,6 +314,10 @@ const Meeting = () => {
           selectedLanguage={selectedLanguage} 
         />
       </div>
+      
+      {showTroubleshooting && (
+        <TroubleshootingGuide onClose={() => setShowTroubleshooting(false)} />
+      )}
     </div>
   );
 };

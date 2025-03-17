@@ -13,8 +13,36 @@ const videoConferenceService = {
    */
   initializeConference: async (options = {}) => {
     try {
-      // Connect to signaling server
-      await webRTCService.connect(options.serverUrl);
+      // Try multiple server URLs if the primary one fails
+      const servers = [
+        options.serverUrl || null,
+        process.env.REACT_APP_API_URL,
+        'https://api.live-translate.org',
+        'http://localhost:3001'
+      ].filter(Boolean);
+      
+      let connected = false;
+      let error = null;
+      
+      // Try each server until one connects
+      for (const server of servers) {
+        if (connected) break;
+        
+        try {
+          await webRTCService.connect(server);
+          connected = true;
+        } catch (err) {
+          console.warn(`Failed to connect to ${server}:`, err);
+          error = err;
+          // Continue to next server
+        }
+      }
+
+      if (!connected) {
+        console.warn('Failed to connect to any signaling server, continuing in local-only mode');
+        // Throw the last error to be handled by the caller
+        throw error || new Error('Failed to connect to any signaling server');
+      }
       
       // Get local stream
       const localStream = await webRTCService.startLocalStream();
@@ -28,7 +56,10 @@ const videoConferenceService = {
       return {
         success: false,
         error: error.message,
-        localStream: null
+        localStream: await webRTCService.startLocalStream().catch(e => {
+          console.error('Failed to get local stream in fallback mode:', e);
+          return null;
+        })
       };
     }
   },
@@ -48,6 +79,44 @@ const videoConferenceService = {
    */
   leaveMeeting: () => {
     webRTCService.disconnect();
+  },
+  
+  /**
+   * Share screen with meeting participants
+   * @returns {Promise<MediaStream>} The screen sharing stream
+   */
+  shareScreen: async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+      
+      // If connected to signaling server, notify peers
+      if (webRTCService.isConnected()) {
+        webRTCService.sendScreenSharingStatus(true);
+      }
+      
+      return stream;
+    } catch (error) {
+      console.error('Screen sharing error:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Stop sharing screen
+   * @param {MediaStream} stream - The screen sharing stream to stop
+   */
+  stopScreenSharing: (stream) => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      
+      // If connected to signaling server, notify peers
+      if (webRTCService.isConnected()) {
+        webRTCService.sendScreenSharingStatus(false);
+      }
+    }
   }
 };
 

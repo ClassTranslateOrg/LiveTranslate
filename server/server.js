@@ -10,7 +10,7 @@ const { Issuer, generators } = require('openid-client');
 const app = express();
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? 'https://live-translate.org' 
+    ? ['https://live-translate.org', 'https://www.live-translate.org'] 
     : 'http://localhost:3000',
   credentials: true
 }));
@@ -37,7 +37,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? 'https://live-translate.org' 
+      ? ['https://live-translate.org', 'https://www.live-translate.org'] 
       : 'http://localhost:3000',
     methods: ["GET", "POST"],
     credentials: true
@@ -101,6 +101,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// Home route
+app.get('/', checkAuth, (req, res) => {
+  res.render('home', { 
+    isAuthenticated: req.isAuthenticated,
+    userInfo: req.session.userInfo || {}
+  });
+});
+
 // Auth routes
 app.get('/auth/login', (req, res) => {
   try {
@@ -113,6 +121,11 @@ app.get('/auth/login', (req, res) => {
     // Store the original URL to redirect back after login
     if (req.query.redirect) {
       req.session.redirectUrl = req.query.redirect;
+    }
+
+    if (!client) {
+      console.error("OpenID Client not initialized");
+      return res.status(500).json({ error: 'Authentication service not available' });
     }
 
     const authUrl = client.authorizationUrl({
@@ -296,6 +309,28 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle screen sharing signals
+  socket.on('screen-share-signal', (data) => {
+    if (socket.roomId) {
+      // Share screen sharing signal with other users in the room
+      socket.to(socket.roomId).emit('screen-share-signal', {
+        userId: socket.id,
+        ...data
+      });
+    }
+  });
+  
+  // Handle screen sharing status updates
+  socket.on('screen-sharing-status', (isSharing) => {
+    if (socket.roomId) {
+      // Notify other users about the screen sharing status
+      socket.to(socket.roomId).emit('screen-sharing-status', {
+        userId: socket.id,
+        isSharing
+      });
+    }
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
@@ -325,6 +360,7 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Mode: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Server URL: ${process.env.NODE_ENV === 'production' ? 'https://api.live-translate.org' : `http://localhost:${PORT}`}`);
 });
 
 // Handle process shutdown

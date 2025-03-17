@@ -36,11 +36,29 @@
             margin: 15px 0;
             overflow-x: auto;
         }
+        .status-info {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error-info {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>LiveTranslate Authentication</h1>
+        
+        <div class="status-info">
+            Server Status: Online
+        </div>
 
         <% if (isAuthenticated) { %>
             <div>
@@ -52,12 +70,22 @@
                 </div>
                 
                 <a href="/auth/logout" class="btn">Logout</a>
-                <a href="/" class="btn">Go to LiveTranslate</a>
+                <a href="https://live-translate.org" class="btn">Go to LiveTranslate</a>
+                <a href="http://localhost:3000" class="btn">Go to Local Development</a>
             </div>
         <% } else { %>
             <p>You need to authenticate to access LiveTranslate features.</p>
             <a href="/auth/login" class="btn">Login</a>
         <% } %>
+        
+        <div style="margin-top: 30px;">
+            <h3>Troubleshooting</h3>
+            <ul>
+                <li>If you're experiencing connection issues, check that your DNS settings are properly configured.</li>
+                <li>For local development, ensure both the frontend (port 3000) and backend (port 3001) servers are running.</li>
+                <li>Make sure your browser allows WebRTC connections and has microphone/camera permissions.</li>
+            </ul>
+        </div>
     </div>
 </body>
 </html>
