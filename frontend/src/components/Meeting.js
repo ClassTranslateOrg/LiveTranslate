@@ -4,7 +4,6 @@ import TranslationPanel from './TranslationPanel';
 import ChatPanel from './ChatPanel';
 import webRTCService from '../utils/webrtcService';
 import videoConferenceService from '../utils/videoConferenceService';
-import { isOpenAIAvailable } from '../utils/openaiService';
 
 const Meeting = () => {
   const { id } = useParams();
@@ -16,28 +15,10 @@ const Meeting = () => {
   const [participants, setParticipants] = useState([]);
   const localVideoRef = useRef(null);
   const remoteVideosRef = useRef({});
-  const [apiErrors, setApiErrors] = useState({
-    openai: false,
-    signaling: false
-  });
   
   // Check if running in GitHub Codespaces
   const isGitHubCodespaces = window.location.hostname.includes('github.dev') || 
                              window.location.hostname.includes('app.github.dev');
-
-  useEffect(() => {
-    // Check OpenAI API availability
-    const checkOpenAiStatus = async () => {
-      try {
-        const isAvailable = await isOpenAIAvailable();
-        setApiErrors(prev => ({...prev, openai: !isAvailable}));
-      } catch (error) {
-        setApiErrors(prev => ({...prev, openai: true}));
-      }
-    };
-    
-    checkOpenAiStatus();
-  }, []);
 
   // Join the meeting
   useEffect(() => {
@@ -53,10 +34,8 @@ const Meeting = () => {
         if (!result.success) {
           setConnectionStatus('local-only');
           console.warn('Failed to connect to signaling server, continuing in local-only mode');
-          setApiErrors(prev => ({...prev, signaling: true}));
         } else {
           setConnectionStatus('connected');
-          setApiErrors(prev => ({...prev, signaling: false}));
         }
 
         // Display local video if we have a stream
@@ -154,18 +133,6 @@ const Meeting = () => {
   return (
     <div className="meeting-container">
       {error && <div className="error-message">{error}</div>}
-      
-      {apiErrors.openai && (
-        <div className="api-warning">
-          <strong>OpenAI API Unavailable:</strong> Translation functionality will be limited.
-        </div>
-      )}
-      
-      {apiErrors.signaling && (
-        <div className="api-warning">
-          <strong>Signaling Server Unavailable:</strong> Using local-only mode. Other participants cannot join.
-        </div>
-      )}
       
       {isGitHubCodespaces && (
         <div className="warning-message">

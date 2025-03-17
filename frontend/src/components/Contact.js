@@ -141,7 +141,7 @@ const Contact = () => {
           
           <div className="contact-method">
             <h4>Location</h4>
-            <p>Rockville, MD</p>
+            <p>San Francisco, CA</p>
           </div>
         </div>
       </div>

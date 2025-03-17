@@ -50,9 +50,7 @@ class WebRTCService {
       } else if (process.env.REACT_APP_API_URL) {
         serverUrl = process.env.REACT_APP_API_URL;
       } else if (process.env.NODE_ENV === 'production') {
-        // Use localhost as fallback if api.live-translate.org is not available in production
-        serverUrl = 'http://localhost:3001';
-        console.warn('No API URL provided, using localhost for signaling server');
+        serverUrl = 'https://api.live-translate.org';
       } else {
         serverUrl = 'http://localhost:3001';
       }
@@ -69,25 +67,11 @@ class WebRTCService {
           reject(new Error('Connection timeout - server may be down'));
         }, 5000);
         
-        // Connection options with fallback
-        const options = {
+        this.socket = io(serverUrl, {
           reconnectionAttempts: 3,
           timeout: 5000,
-          withCredentials: true,
-          // Add fallback transport mechanisms
-          transports: ['websocket', 'polling']
-        };
-        
-        // Try to connect to the signaling server
-        try {
-          this.socket = io(serverUrl, options);
-        } catch (error) {
-          console.error('Error creating socket connection:', error);
-          clearTimeout(timeout);
-          this.connectionFailed = true;
-          reject(error);
-          return;
-        }
+          withCredentials: true
+        });
 
         this.socket.on('connect', () => {
           clearTimeout(timeout);
