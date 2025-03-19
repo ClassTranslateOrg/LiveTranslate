@@ -12,8 +12,7 @@ const About = () => {
         <h2>Our Mission</h2>
         <p>
           LiveTranslate aims to break down language barriers in virtual communication by providing real-time translation
-          of speech and text during video conferences. Our technology makes it possible for people who speak different
-          languages to communicate effectively without requiring interpreters.
+          of speech and text.
         </p>
       </div>
       
@@ -22,17 +21,17 @@ const About = () => {
         <div className="tech-stack-grid">
           <div className="tech-item">
             <h3>Real-time Translation</h3>
-            <p>Powered by OpenAI's Whisper API, our translation engine provides accurate, real-time translation across multiple languages.</p>
+            <p>OpenAI's Whisper API with real-time translation across multiple languages.</p>
           </div>
           
           <div className="tech-item">
             <h3>Video Conferencing</h3>
-            <p>We use WebRTC technology to provide secure, peer-to-peer video communication that works directly in your browser.</p>
+            <p>Update later</p>
           </div>
           
           <div className="tech-item">
             <h3>Cloud Infrastructure</h3>
-            <p>Our application is hosted on AWS with Amplify providing continuous deployment, authentication, and API services.</p>
+            <p>N/A</p>
           </div>
         </div>
       </div>

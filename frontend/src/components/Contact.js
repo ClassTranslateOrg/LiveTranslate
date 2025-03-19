@@ -23,8 +23,6 @@ const Contact = () => {
     setIsSubmitting(true);
     
     try {
-      // In a real application, this would send the data to your backend
-      // For now, we'll simulate a successful submission
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setSubmitResult({

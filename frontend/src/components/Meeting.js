@@ -21,7 +21,6 @@ const Meeting = () => {
   const remoteVideosRef = useRef({});
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   
-  // Check if running in GitHub Codespaces
   const isGitHubCodespaces = window.location.hostname.includes('github.dev') || 
                              window.location.hostname.includes('app.github.dev');
 

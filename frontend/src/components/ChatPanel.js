@@ -11,13 +11,11 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
   const messagesEndRef = useRef(null);
   const { user } = useContext(AuthContext);
   
-  // Current user info
   const currentUser = {
     id: webRTCService.socket?.id || 'local',
     name: user?.name || user?.email || 'You'
   };
   
-  // Check for OpenAI API key on component mount
   useEffect(() => {
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
       console.warn('OpenAI API key not found. Translation service will not work.');
@@ -25,7 +23,6 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
     }
   }, []);
   
-  // Register WebSocket event handlers
   useEffect(() => {
     // Skip if we're not connected to the signaling server
     if (!webRTCService.isConnected()) {
@@ -51,7 +48,6 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
       return;
     }
     
-    // Handle incoming chat messages
     const handleChatMessage = (userId, messageData) => {
       setMessages(prev => [...prev, {
         ...messageData,
@@ -64,21 +60,17 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
       }]);
     };
     
-    // Register chat message handler
     webRTCService.onChatMessage(handleChatMessage);
     
     // Clean up
     return () => {
-      // In a real implementation, we would unregister listeners here
     };
   }, [isTranslatingChat]);
   
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle changes to selected language - translate existing messages when needed
   useEffect(() => {
     if (isTranslatingChat && selectedLanguage && isApiAvailable) {
       const translateMessages = async () => {
@@ -89,7 +81,6 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
         
         if (messagesToTranslate.length === 0) return;
         
-        // Mark messages as being translated
         setMessages(prev => 
           prev.map(msg => {
             if (!msg.translated || msg.translationLanguage !== selectedLanguage) {
@@ -99,12 +90,10 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
           })
         );
         
-        // Translate each message one by one
         for (const msg of messagesToTranslate) {
           try {
             const translatedText = await translateChatMessage(msg.text, selectedLanguage);
             
-            // Update the message with the translation
             setMessages(prev => 
               prev.map(m => {
                 if (m.id === msg.id) {
@@ -121,7 +110,6 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
           } catch (error) {
             console.error(`Failed to translate message: ${msg.id}`, error);
             
-            // Mark message as not translating (error occurred)
             setMessages(prev => 
               prev.map(m => {
                 if (m.id === msg.id) {
@@ -154,7 +142,6 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
     setMessages(prev => [...prev, messageData]);
     setNewMessage('');
     
-    // Send message to other participants if connected
     if (webRTCService.isConnected()) {
       webRTCService.sendMessage({
         text: newMessage,
@@ -164,10 +151,8 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
       });
     }
     
-    // If translation is enabled, translate the sent message right away
     if (isTranslatingChat && selectedLanguage && isApiAvailable) {
       try {
-        // Mark the message as translating
         setMessages(prev => 
           prev.map(m => {
             if (m.id === messageData.id) {
@@ -195,7 +180,6 @@ const ChatPanel = ({ meetingId, selectedLanguage }) => {
       } catch (error) {
         console.error('Failed to translate message:', error);
         
-        // Mark message as not translating (error occurred)
         setMessages(prev => 
           prev.map(m => {
             if (m.id === messageData.id) {

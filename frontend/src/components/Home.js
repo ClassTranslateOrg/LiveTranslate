@@ -18,10 +18,9 @@ const Home = ({ isLoggedIn }) => {
     setIsCreatingMeeting(true);
     
     try {
-      // In a real app, this would be an API call to create a meeting
+      //real app (API call) 
       const mockMeetingId = Math.floor(100000000 + Math.random() * 900000000);
       
-      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       navigate(`/meeting/${mockMeetingId}`);
