@@ -126,20 +126,20 @@ const Contact = () => {
           
           <div className="contact-method">
             <h4>Email</h4>
-            <p>support@live-translate.org</p>
+            <p>devnarang083@gmail.com</p>
           </div>
           
           <div className="contact-method">
             <h4>Social Media</h4>
             <div className="social-links">
-              <a href="https://twitter.com/livetranslate" target="_blank" rel="noopener noreferrer">Twitter</a>
-              <a href="https://linkedin.com/company/livetranslate" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+              <a href="" target="_blank" rel="noopener noreferrer">Twitter</a>
+              <a href="" target="_blank" rel="noopener noreferrer">LinkedIn</a>
             </div>
           </div>
           
           <div className="contact-method">
             <h4>Location</h4>
-            <p>San Francisco, CA</p>
+            <p>Tenleytown DC</p>
           </div>
         </div>
       </div>
